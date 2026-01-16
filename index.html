@@ -7,10 +7,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        /* --- DESIGN VARIABLES (Cinema Theme) --- */
+        /* --- 1. DESIGN VARIABLES --- */
         :root {
             --primary: #E50914; /* Netflix Red */
-            --glass-bg: rgba(20, 20, 20, 0.9);
+            --glass-bg: rgba(20, 20, 20, 0.95);
             --glass-border: 1px solid rgba(255, 255, 255, 0.15);
             --radius: 24px;
             --font: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -71,10 +71,30 @@
         .blur-heavy { filter: blur(30px); }
         .blur-none { filter: blur(0px); }
 
-        .video-container { position: relative; width: 100%; padding-bottom: 56.25%; /* 16:9 */ height: 0; border-radius: 16px; overflow: hidden; margin-bottom: 20px; background: black; border: 1px solid rgba(255,255,255,0.2); }
-        .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        /* Blocker div to hide youtube title if needed */
-        .yt-blocker { position: absolute; top: 0; left: 0; width: 100%; height: 60px; background: linear-gradient(to bottom, black, transparent); z-index: 5; pointer-events: none; }
+        /* --- TRAILER FIX: ZOOM & CROP & NO-TOUCH --- */
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 */
+            height: 0;
+            border-radius: 16px;
+            overflow: hidden; /* WICHTIG: Schneidet Ränder ab */
+            margin-bottom: 20px;
+            background: #000;
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none; /* Verhindert Hover/Klick auf Titel */
+        }
+
+        .video-container iframe {
+            position: absolute;
+            /* Zoom auf 150%, damit Titel außerhalb des Bereichs liegt */
+            width: 150%;
+            height: 150%;
+            /* Zentrieren des gezoomten Videos */
+            top: -25%;
+            left: -25%;
+            border: none;
+        }
 
         .quiz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; }
         .quiz-option { background: rgba(255,255,255,0.15); padding: 15px; border-radius: 12px; text-align: center; font-size: 0.9rem; font-weight: bold; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; min-height: 70px; }
@@ -171,13 +191,13 @@
 
 <script>
     /* ================= CORE CONFIG ================= */
-    // HIER DEINEN API KEY EINTRAGEN oder über UI eingeben
     let TMDB_KEY = localStorage.getItem('tmdb_key') || '';
     const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 
     const state = {
         movies: [], pool: [], current: null, next: null,
-        mode: null, score: 0, lives: 3, timeline: [], streak: 0
+        mode: null, score: 0, lives: 3, timeline: [], streak: 0,
+        leftMovie: null, rightMovie: null, timer: null
     };
 
     const els = {
@@ -212,12 +232,10 @@
         }
 
         try {
-            // Hole Seite 1 und 2 für mehr Auswahl
             const d1 = await fetchTMDB(url);
             const d2 = await fetchTMDB(url.replace('page=1', 'page=2'));
 
             let all = [...d1.results, ...d2.results];
-            // Filter: Muss Poster und Datum haben
             state.movies = all.filter(m => m.poster_path && m.release_date && m.backdrop_path);
             state.pool = [...state.movies].sort(() => 0.5 - Math.random());
 
@@ -230,7 +248,6 @@
     }
 
     async function getExtendedDetails(id) {
-        // Für Budget/Revenue oder Youtube ID
         return await fetchTMDB(`movie/${id}?append_to_response=videos`);
     }
 
@@ -240,7 +257,7 @@
         document.getElementById(id).classList.add('active');
     }
     function goHome() { navigate('screen-home'); }
-    function exitGame() { navigate('screen-modes'); }
+    function exitGame() { navigate('screen-modes'); if(state.timer) clearInterval(state.timer); }
     function restartGame() { document.getElementById('overlay-end').classList.remove('visible'); setupGame(state.mode); }
     function updateStatus() {
         els.status.innerText = (state.mode === 'timeline') ? `❤️ ${state.lives}` : `Score: ${state.score}`;
@@ -249,7 +266,9 @@
     /* ================= GAME LOGIC ================= */
     function setupGame(mode) {
         state.mode = mode; state.score = 0; state.lives = 3; state.streak = 0; state.timeline = [];
-        // Pool neu mischen
+        state.leftMovie = null; state.rightMovie = null;
+        if(state.timer) clearInterval(state.timer);
+
         state.pool = [...state.movies].sort(() => 0.5 - Math.random());
         navigate('screen-game');
 
@@ -287,7 +306,6 @@
             <div style="display:flex; flex-direction:column; gap:10px;">
         `;
 
-        // Buttons generieren
         html += `<button class="btn" style="border-style:dashed" onclick="checkTimeline(0)">🔼 Älter als ${state.timeline[0].release_date.split('-')[0]}</button>`;
 
         state.timeline.forEach((m, i) => {
@@ -332,7 +350,6 @@
         if(state.pool.length < 4) { endGame(true, `Score: ${state.score}`); return; }
 
         state.current = state.pool.pop();
-        // 3 falsche Optionen
         let options = [state.current];
         while(options.length < 4) {
             let r = state.pool[Math.floor(Math.random() * state.pool.length)];
@@ -352,20 +369,19 @@
             </div>
         `;
 
-        // Langsam entschärfen (CSS Animation wäre schöner, aber JS ist einfacher für den Loop)
         let blurVal = 30;
-        const interval = setInterval(() => {
+        state.timer = setInterval(() => {
             blurVal -= 0.5;
             const img = document.getElementById('game-poster');
             if(img) img.style.filter = `blur(${Math.max(0, blurVal)}px)`;
-            if(blurVal <= 0) clearInterval(interval);
+            if(blurVal <= 0) clearInterval(state.timer);
         }, 100);
-        state.timer = interval;
     }
 
     function checkPoster(btn, isCorrect) {
         clearInterval(state.timer);
-        document.getElementById('game-poster').style.filter = 'blur(0px)';
+        const img = document.getElementById('game-poster');
+        if(img) img.style.filter = 'blur(0px)';
 
         if(isCorrect) {
             btn.classList.add('correct');
@@ -377,23 +393,22 @@
         }
     }
 
-    /* --- MODE: TRAILER GUESS --- */
+    /* --- MODE: TRAILER GUESS (FIXED) --- */
     async function nextTrailer() {
         document.getElementById('overlay-load').classList.add('visible');
         let trailerKey = null;
 
-        // Suche Film mit Trailer
         while(!trailerKey && state.pool.length > 0) {
             state.current = state.pool.pop();
             const details = await getExtendedDetails(state.current.id);
-            // Suche Youtube Trailer
-            const vid = details.videos.results.find(v => v.site === 'YouTube' && v.type === 'Trailer');
-            if(vid) trailerKey = vid.key;
+            if(details.videos && details.videos.results) {
+                const vid = details.videos.results.find(v => v.site === 'YouTube' && v.type === 'Trailer');
+                if(vid) trailerKey = vid.key;
+            }
         }
 
         if(!trailerKey) return endGame(true, `Keine Trailer mehr. Score: ${state.score}`);
 
-        // Optionen erstellen
         let options = [state.current];
         while(options.length < 4) {
             let r = state.movies[Math.floor(Math.random() * state.movies.length)];
@@ -404,12 +419,12 @@
         document.getElementById('overlay-load').classList.remove('visible');
         updateStatus();
 
+        // Iframe mit aggressiven Autoplay Parametern und Zoom-CSS
         els.gameCon.innerHTML = `
             <div style="width:100%;">
                 <h3 style="text-align:center; margin-bottom:15px;">Welcher Film ist das?</h3>
                 <div class="video-container">
-                    <div class="yt-blocker"></div>
-                    <iframe src="https://www.youtube.com/embed/${trailerKey}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+                    <iframe src="https://www.youtube.com/embed/${trailerKey}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${trailerKey}&iv_load_policy=3&fs=0" frameborder="0" allow="autoplay; encrypted-media"></iframe>
                 </div>
                 <div class="quiz-grid">
                     ${options.map(o => `<div class="quiz-option" onclick="checkTrailer(this, ${o.id === state.current.id})">${o.title}</div>`).join('')}
@@ -429,11 +444,10 @@
         }
     }
 
-    /* --- MODE: CASH / BOX OFFICE (High/Low) --- */
+    /* --- MODE: CASH / BOX OFFICE --- */
     async function nextCash() {
         document.getElementById('overlay-load').classList.add('visible');
 
-        // Wir brauchen 2 Filme mit Revenue Daten
         if(!state.leftMovie) {
              const m = state.pool.pop();
              state.leftMovie = await getExtendedDetails(m.id);
@@ -489,7 +503,7 @@
             alert(`Richtig! ($${(r/1000000).toFixed(1)} Mio)`);
             state.streak++;
             state.score = state.streak;
-            state.leftMovie = state.rightMovie; // Der Rechte wird zum neuen Linken
+            state.leftMovie = state.rightMovie;
             updateStatus();
             nextCash();
         } else {
