@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Moviezster Ultimate</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- DESIGN VARIABLES (Cinema Theme) --- */
+        :root {
+            --primary: #E50914; /* Netflix Red */
+            --glass-bg: rgba(20, 20, 20, 0.9);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.15);
+            --radius: 24px;
+            --font: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            --text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: #000;
+            background-image: linear-gradient(45deg, #000000 0%, #434343 50%, #E50914 100%);
+            background-size: 200% 200%;
+            height: 100vh; width: 100vw;
+            display: flex; justify-content: center; align-items: center;
+            overflow: hidden; color: #ffffff;
+        }
+        body.idle { animation: moveGradient 20s ease infinite; }
+        @keyframes moveGradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+        /* APP FRAME */
+        .app-frame {
+            width: 100%; height: 100%;
+            background: var(--glass-bg); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+            display: flex; flex-direction: column; position: relative;
+        }
+        @media (min-width: 768px) {
+            .app-frame { width: 450px; height: 90%; border-radius: var(--radius); border: var(--glass-border); box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        }
+
+        /* UI ELEMENTS */
+        h1, h2, h3, h4, p, div, span, button { color: #ffffff !important; text-shadow: var(--text-shadow); }
+
+        header { padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+        .brand { font-size: 1.8rem; font-weight: 900; letter-spacing: -1px; }
+        .brand span { color: var(--primary) !important; }
+        .status-pill { background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 50px; font-weight: bold; border: 1px solid rgba(255,255,255,0.2); font-size: 0.9rem; }
+
+        .screen { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: absolute; top: 0; bottom: 0; left: 0; right: 0; opacity: 0; pointer-events: none; transition: all 0.3s ease; padding-top: 80px; }
+        .screen.active { opacity: 1; pointer-events: all; z-index: 10; padding-top: 0; position: relative; }
+        .scroll-y { overflow-y: auto; padding: 20px; flex: 1; }
+
+        .btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 15px; border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-bottom: 10px; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.96); }
+        .btn-primary { background: var(--primary); border: none; }
+
+        /* CARDS & GRID */
+        .genre-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .genre-card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+        .genre-card:hover { background: rgba(255,255,255,0.1); }
+
+        .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .mode-card { aspect-ratio: 1; background: rgba(255,255,255,0.1); border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; }
+        .mode-card i { font-size: 2rem; margin-bottom: 10px; }
+
+        /* GAME ELEMENTS */
+        .poster-wrap { width: 200px; height: 300px; margin: 0 auto 20px; position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.2); }
+        .poster-img { width: 100%; height: 100%; object-fit: cover; transition: filter 0.5s; }
+        .blur-heavy { filter: blur(30px); }
+        .blur-none { filter: blur(0px); }
+
+        .video-container { position: relative; width: 100%; padding-bottom: 56.25%; /* 16:9 */ height: 0; border-radius: 16px; overflow: hidden; margin-bottom: 20px; background: black; border: 1px solid rgba(255,255,255,0.2); }
+        .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        /* Blocker div to hide youtube title if needed */
+        .yt-blocker { position: absolute; top: 0; left: 0; width: 100%; height: 60px; background: linear-gradient(to bottom, black, transparent); z-index: 5; pointer-events: none; }
+
+        .quiz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: auto; }
+        .quiz-option { background: rgba(255,255,255,0.15); padding: 15px; border-radius: 12px; text-align: center; font-size: 0.9rem; font-weight: bold; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; min-height: 70px; }
+        .quiz-option.correct { background: #2ecc71 !important; }
+        .quiz-option.wrong { background: #e74c3c !important; }
+
+        .timeline-item { background: white; color: black !important; padding: 10px; border-radius: 8px; margin: 5px 0; display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
+        .timeline-year { background: var(--primary); color: white !important; padding: 5px 10px; border-radius: 5px; }
+
+        /* OVERLAYS */
+        .overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.95); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .overlay.visible { opacity: 1; pointer-events: all; }
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s infinite linear; margin-bottom: 20px; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="idle">
+
+<div class="app-frame">
+    <header>
+        <div class="brand">Movie<span>ster</span></div>
+        <div class="status-pill" id="header-status">Home</div>
+    </header>
+
+    <div id="screen-home" class="screen active">
+        <div class="scroll-y">
+            <h2 style="margin-bottom:10px;">Kategorie wählen</h2>
+            <p style="opacity:0.7; margin-bottom:20px;">Datenbasis: TMDB</p>
+
+            <div class="genre-grid">
+                <div class="genre-card" onclick="fetchMovies('popular', 'Beliebt')">🔥<br>Beliebt</div>
+                <div class="genre-card" onclick="fetchMovies('top_rated', 'Bestbewertet')">⭐<br>Top Rated</div>
+                <div class="genre-card" onclick="fetchMovies('28', 'Action')">💥<br>Action</div>
+                <div class="genre-card" onclick="fetchMovies('27', 'Horror')">👻<br>Horror</div>
+                <div class="genre-card" onclick="fetchMovies('878', 'Sci-Fi')">👽<br>Sci-Fi</div>
+                <div class="genre-card" onclick="fetchMovies('35', 'Comedy')">😂<br>Comedy</div>
+                <div class="genre-card" onclick="fetchMovies('16', 'Animation')">🐭<br>Animation</div>
+                <div class="genre-card" onclick="fetchMovies('18', 'Drama')">🎭<br>Drama</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.1); padding:15px; border-radius:12px; margin-top:20px;">
+                <h4>⚙️ API Setup</h4>
+                <p style="font-size:0.8rem; margin-bottom:10px;">Du brauchst einen TMDB API Key.</p>
+                <input type="text" id="api-key-input" placeholder="TMDB API Key hier einfügen" style="width:100%; padding:10px; border-radius:8px; border:none; margin-bottom:10px; color:black;">
+                <button class="btn btn-primary" style="padding:10px;" onclick="saveKey()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-modes" class="screen">
+        <div class="scroll-y">
+            <h2 id="selected-genre-title" style="color:var(--primary)!important; margin-bottom:20px;">Kategorie</h2>
+            <div class="mode-grid">
+                <div class="mode-card" onclick="setupGame('timeline')">
+                    <i class="fas fa-stream" style="color:#3498db"></i>
+                    <h4>Timeline</h4><p style="font-size:0.8rem; opacity:0.7;">Wann kam er raus?</p>
+                </div>
+                <div class="mode-card" onclick="setupGame('poster')">
+                    <i class="fas fa-eye-slash" style="color:#f1c40f"></i>
+                    <h4>Blur</h4><p style="font-size:0.8rem; opacity:0.7;">Erkennst du das Poster?</p>
+                </div>
+                <div class="mode-card" onclick="setupGame('trailer')">
+                    <i class="fas fa-film" style="color:var(--primary)"></i>
+                    <h4>Trailer</h4><p style="font-size:0.8rem; opacity:0.7;">Rate den Film</p>
+                </div>
+                <div class="mode-card" onclick="setupGame('cash')">
+                    <i class="fas fa-sack-dollar" style="color:#2ecc71"></i>
+                    <h4>Box Office</h4><p style="font-size:0.8rem; opacity:0.7;">Wer verdiente mehr?</p>
+                </div>
+            </div>
+            <button class="btn" style="margin-top:30px;" onclick="goHome()">Zurück</button>
+        </div>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <div style="padding:10px 20px;">
+            <button class="btn" style="padding:10px; font-size:0.9rem;" onclick="exitGame()">Beenden</button>
+        </div>
+        <div id="game-content" class="scroll-y" style="display:flex; flex-direction:column;"></div>
+    </div>
+
+    <div id="overlay-load" class="overlay"><div class="spinner"></div><h3>Lade Filme...</h3></div>
+    <div id="overlay-end" class="overlay">
+        <h1 id="end-title" style="font-size:3rem; margin-bottom:10px;">Game Over</h1>
+        <p id="end-msg" style="font-size:1.3rem; opacity:0.9; margin-bottom:30px;">Score: 0</p>
+        <div style="display:flex; gap:15px;">
+            <button class="btn" onclick="exitGame()">Menü</button>
+            <button class="btn btn-primary" onclick="restartGame()">Nochmal</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* ================= CORE CONFIG ================= */
+    // HIER DEINEN API KEY EINTRAGEN oder über UI eingeben
+    let TMDB_KEY = localStorage.getItem('tmdb_key') || '';
+    const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+
+    const state = {
+        movies: [], pool: [], current: null, next: null,
+        mode: null, score: 0, lives: 3, timeline: [], streak: 0
+    };
+
+    const els = {
+        gameCon: document.getElementById('game-content'),
+        status: document.getElementById('header-status')
+    };
+
+    function saveKey() {
+        const val = document.getElementById('api-key-input').value.trim();
+        if(val) {
+            localStorage.setItem('tmdb_key', val);
+            TMDB_KEY = val;
+            alert('Key gespeichert!');
+        }
+    }
+
+    /* ================= API HANDLER ================= */
+    async function fetchTMDB(endpoint) {
+        if(!TMDB_KEY) { alert("Bitte erst API Key eingeben!"); return null; }
+        const sep = endpoint.includes('?') ? '&' : '?';
+        const res = await fetch(`https://api.themoviedb.org/3/${endpoint}${sep}api_key=${TMDB_KEY}&language=de-DE`);
+        return await res.json();
+    }
+
+    async function fetchMovies(catId, title) {
+        document.getElementById('overlay-load').classList.add('visible');
+        let url = '';
+        if(catId === 'popular' || catId === 'top_rated') {
+            url = `movie/${catId}?page=1`;
+        } else {
+            url = `discover/movie?with_genres=${catId}&sort_by=popularity.desc&page=1`;
+        }
+
+        try {
+            // Hole Seite 1 und 2 für mehr Auswahl
+            const d1 = await fetchTMDB(url);
+            const d2 = await fetchTMDB(url.replace('page=1', 'page=2'));
+
+            let all = [...d1.results, ...d2.results];
+            // Filter: Muss Poster und Datum haben
+            state.movies = all.filter(m => m.poster_path && m.release_date && m.backdrop_path);
+            state.pool = [...state.movies].sort(() => 0.5 - Math.random());
+
+            document.getElementById('selected-genre-title').innerText = title;
+            navigate('screen-modes');
+        } catch(e) {
+            alert("Fehler beim Laden. API Key prüfen?");
+        }
+        document.getElementById('overlay-load').classList.remove('visible');
+    }
+
+    async function getExtendedDetails(id) {
+        // Für Budget/Revenue oder Youtube ID
+        return await fetchTMDB(`movie/${id}?append_to_response=videos`);
+    }
+
+    /* ================= NAVIGATION ================= */
+    function navigate(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+    function goHome() { navigate('screen-home'); }
+    function exitGame() { navigate('screen-modes'); }
+    function restartGame() { document.getElementById('overlay-end').classList.remove('visible'); setupGame(state.mode); }
+    function updateStatus() {
+        els.status.innerText = (state.mode === 'timeline') ? `❤️ ${state.lives}` : `Score: ${state.score}`;
+    }
+
+    /* ================= GAME LOGIC ================= */
+    function setupGame(mode) {
+        state.mode = mode; state.score = 0; state.lives = 3; state.streak = 0; state.timeline = [];
+        // Pool neu mischen
+        state.pool = [...state.movies].sort(() => 0.5 - Math.random());
+        navigate('screen-game');
+
+        if(mode === 'timeline') initTimeline();
+        else if(mode === 'poster') nextPoster();
+        else if(mode === 'trailer') nextTrailer();
+        else if(mode === 'cash') nextCash();
+    }
+
+    function endGame(win, msg) {
+        document.getElementById('end-title').innerText = win ? "Gewonnen!" : "Game Over";
+        document.getElementById('end-msg').innerText = msg;
+        document.getElementById('overlay-end').classList.add('visible');
+    }
+
+    /* --- MODE: TIMELINE --- */
+    function initTimeline() {
+        state.timeline = [state.pool.pop()];
+        updateStatus();
+        nextTimelineRound();
+    }
+    function nextTimelineRound() {
+        if(state.pool.length === 0) return endGame(true, "Alle Filme sortiert!");
+        state.current = state.pool.pop();
+        const year = state.current.release_date.split('-')[0];
+
+        let html = `
+            <div style="text-align:center; margin-bottom:20px;">
+                <div class="poster-wrap" style="height:220px; width:150px;">
+                    <img src="${IMG_BASE}${state.current.poster_path}" class="poster-img">
+                </div>
+                <h3>${state.current.title}</h3>
+                <p>Wohin gehört dieser Film?</p>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+        `;
+
+        // Buttons generieren
+        html += `<button class="btn" style="border-style:dashed" onclick="checkTimeline(0)">🔼 Älter als ${state.timeline[0].release_date.split('-')[0]}</button>`;
+
+        state.timeline.forEach((m, i) => {
+            const y = m.release_date.split('-')[0];
+            html += `<div class="timeline-item">
+                        <span>${m.title}</span> <span class="timeline-year">${y}</span>
+                     </div>`;
+            if(i < state.timeline.length) {
+                html += `<button class="btn" style="border-style:dashed" onclick="checkTimeline(${i+1})">Hier einfügen</button>`;
+            }
+        });
+
+        html += `</div>`;
+        els.gameCon.innerHTML = html;
+    }
+
+    function checkTimeline(index) {
+        const date = new Date(state.current.release_date);
+        const prev = state.timeline[index-1] ? new Date(state.timeline[index-1].release_date) : null;
+        const next = state.timeline[index] ? new Date(state.timeline[index].release_date) : null;
+
+        let correct = true;
+        if(prev && date < prev) correct = false;
+        if(next && date > next) correct = false;
+
+        if(correct) {
+            state.timeline.splice(index, 0, state.current);
+            state.score++;
+            if(state.score >= 10) endGame(true, "Du bist ein Film-Lexikon!");
+            else nextTimelineRound();
+        } else {
+            state.lives--;
+            updateStatus();
+            alert(`Falsch! ${state.current.title} ist von ${state.current.release_date.split('-')[0]}`);
+            if(state.lives <= 0) endGame(false, "Keine Leben mehr");
+            else nextTimelineRound();
+        }
+    }
+
+    /* --- MODE: POSTER BLUR --- */
+    function nextPoster() {
+        if(state.pool.length < 4) { endGame(true, `Score: ${state.score}`); return; }
+
+        state.current = state.pool.pop();
+        // 3 falsche Optionen
+        let options = [state.current];
+        while(options.length < 4) {
+            let r = state.pool[Math.floor(Math.random() * state.pool.length)];
+            if(!options.includes(r)) options.push(r);
+        }
+        options.sort(() => 0.5 - Math.random());
+
+        updateStatus();
+        els.gameCon.innerHTML = `
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                <div class="poster-wrap">
+                    <img id="game-poster" src="${IMG_BASE}${state.current.poster_path}" class="poster-img blur-heavy">
+                </div>
+                <div class="quiz-grid" style="width:100%;">
+                    ${options.map(o => `<div class="quiz-option" onclick="checkPoster(this, ${o.id === state.current.id})">${o.title}</div>`).join('')}
+                </div>
+            </div>
+        `;
+
+        // Langsam entschärfen (CSS Animation wäre schöner, aber JS ist einfacher für den Loop)
+        let blurVal = 30;
+        const interval = setInterval(() => {
+            blurVal -= 0.5;
+            const img = document.getElementById('game-poster');
+            if(img) img.style.filter = `blur(${Math.max(0, blurVal)}px)`;
+            if(blurVal <= 0) clearInterval(interval);
+        }, 100);
+        state.timer = interval;
+    }
+
+    function checkPoster(btn, isCorrect) {
+        clearInterval(state.timer);
+        document.getElementById('game-poster').style.filter = 'blur(0px)';
+
+        if(isCorrect) {
+            btn.classList.add('correct');
+            state.score += 100;
+            setTimeout(nextPoster, 1500);
+        } else {
+            btn.classList.add('wrong');
+            setTimeout(() => endGame(false, `Score: ${state.score}`), 2000);
+        }
+    }
+
+    /* --- MODE: TRAILER GUESS --- */
+    async function nextTrailer() {
+        document.getElementById('overlay-load').classList.add('visible');
+        let trailerKey = null;
+
+        // Suche Film mit Trailer
+        while(!trailerKey && state.pool.length > 0) {
+            state.current = state.pool.pop();
+            const details = await getExtendedDetails(state.current.id);
+            // Suche Youtube Trailer
+            const vid = details.videos.results.find(v => v.site === 'YouTube' && v.type === 'Trailer');
+            if(vid) trailerKey = vid.key;
+        }
+
+        if(!trailerKey) return endGame(true, `Keine Trailer mehr. Score: ${state.score}`);
+
+        // Optionen erstellen
+        let options = [state.current];
+        while(options.length < 4) {
+            let r = state.movies[Math.floor(Math.random() * state.movies.length)];
+            if(!options.some(o => o.id === r.id)) options.push(r);
+        }
+        options.sort(() => 0.5 - Math.random());
+
+        document.getElementById('overlay-load').classList.remove('visible');
+        updateStatus();
+
+        els.gameCon.innerHTML = `
+            <div style="width:100%;">
+                <h3 style="text-align:center; margin-bottom:15px;">Welcher Film ist das?</h3>
+                <div class="video-container">
+                    <div class="yt-blocker"></div>
+                    <iframe src="https://www.youtube.com/embed/${trailerKey}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+                </div>
+                <div class="quiz-grid">
+                    ${options.map(o => `<div class="quiz-option" onclick="checkTrailer(this, ${o.id === state.current.id})">${o.title}</div>`).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function checkTrailer(btn, isCorrect) {
+        if(isCorrect) {
+            btn.classList.add('correct');
+            state.score += 200;
+            setTimeout(nextTrailer, 1000);
+        } else {
+            btn.classList.add('wrong');
+            setTimeout(() => endGame(false, `Score: ${state.score}`), 2000);
+        }
+    }
+
+    /* --- MODE: CASH / BOX OFFICE (High/Low) --- */
+    async function nextCash() {
+        document.getElementById('overlay-load').classList.add('visible');
+
+        // Wir brauchen 2 Filme mit Revenue Daten
+        if(!state.leftMovie) {
+             const m = state.pool.pop();
+             state.leftMovie = await getExtendedDetails(m.id);
+        }
+
+        let validRight = false;
+        while(!validRight && state.pool.length > 0) {
+            const m = state.pool.pop();
+            const det = await getExtendedDetails(m.id);
+            if(det.revenue > 0 && det.revenue !== state.leftMovie.revenue) {
+                state.rightMovie = det;
+                validRight = true;
+            }
+        }
+
+        if(!validRight) return endGame(true, `Streak: ${state.streak}`);
+        document.getElementById('overlay-load').classList.remove('visible');
+
+        const formatMoney = (n) => "$" + (n/1000000).toFixed(1) + " Mio.";
+
+        els.gameCon.innerHTML = `
+            <div style="text-align:center; margin-top:20px;">
+                <h3 style="color:#2ecc71; margin-bottom:20px;">Höheres Box Office?</h3>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <div style="width:45%">
+                        <img src="${IMG_BASE}${state.leftMovie.poster_path}" style="width:100%; border-radius:10px;">
+                        <p style="font-size:0.8rem; margin-top:5px;">${state.leftMovie.title}</p>
+                        <p style="color:#f1c40f; font-weight:bold;">${formatMoney(state.leftMovie.revenue)}</p>
+                    </div>
+                    <div style="font-weight:bold; font-size:1.5rem;">VS</div>
+                    <div style="width:45%">
+                        <img src="${IMG_BASE}${state.rightMovie.poster_path}" style="width:100%; border-radius:10px;">
+                        <p style="font-size:0.8rem; margin-top:5px;">${state.rightMovie.title}</p>
+                        <p style="color:#f1c40f; font-weight:bold;">???</p>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="btn" style="background:#e74c3c; border:none;" onclick="checkCash(false)">Weniger 🔽</button>
+                    <button class="btn" style="background:#2ecc71; border:none;" onclick="checkCash(true)">Mehr 🔼</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function checkCash(guessHigher) {
+        const l = state.leftMovie.revenue;
+        const r = state.rightMovie.revenue;
+        const isHigher = r > l;
+
+        if(guessHigher === isHigher) {
+            alert(`Richtig! ($${(r/1000000).toFixed(1)} Mio)`);
+            state.streak++;
+            state.score = state.streak;
+            state.leftMovie = state.rightMovie; // Der Rechte wird zum neuen Linken
+            updateStatus();
+            nextCash();
+        } else {
+            alert(`Falsch! Es waren $${(r/1000000).toFixed(1)} Mio.`);
+            endGame(false, `Streak: ${state.streak}`);
+        }
+    }
+
+</script>
+</body>
+</html>
